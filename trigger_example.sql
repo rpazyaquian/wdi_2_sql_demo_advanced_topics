@@ -1,7 +1,7 @@
 DROP DATABASE IF EXISTS survey_corps;
 CREATE DATABASE survey_corps;
 
-\c
+\c survey_corps
 
 DROP TABLE IF EXISTS members;
 DROP TABLE IF EXISTS shifters;
@@ -14,7 +14,7 @@ CREATE TABLE members (
 );
 
 CREATE TABLE shifters (
-  member_id INTEGER,
+  member_id INTEGER REFERENCES members,
   name TEXT,
   shifted BOOLEAN
 );
@@ -24,36 +24,65 @@ INSERT INTO members (id, name, rank, damaged) VALUES
   (2, 'Ackerman', 'Soldier', FALSE),
   (3, 'Arlert', 'Soldier', FALSE),
   (4, 'Kirstein', 'Soldier', FALSE),
-  (5, 'Ackerman', 'Corporal', FALSE),
+  (5, 'Midget', 'Corporal', FALSE),
   (6, 'Zoe', 'Corporal', FALSE),
   (7, 'Smith', 'Commander', FALSE),
   (8, 'Hoover', 'Soldier', FALSE),
   (9, 'Braun', 'Soldier', FALSE),
   (10, 'Lenz', 'Soldier', FALSE),
   (11, 'Ymir', 'Soldier', FALSE),
-  (12, 'Springer', 'Soldier', FALSE)
+  (12, 'Springer', 'Soldier', FALSE),
+  (13, 'Braus', 'Soldier', FALSE)
 ;
 
-INSERT INTO shifters (member_id, name, shifted) VALUES
-  (1, 'Yeager', FALSE),
-  (8, 'Hoover', FALSE),
-  (9, 'Braun', FALSE),
-  (11, 'Ymir', FALSE)
+-- INSERT INTO shifters (shifted)
+
+WITH ins (member, shifted) AS
+(VALUES
+  ('Yeager', FALSE),
+  ('Hoover', FALSE),
+  ('Braun', FALSE),
+  ('Ymir', FALSE)
+)
+INSERT INTO shifters
+  (member_id, shifted)
+SELECT
+  members.id, ins.shifted
+FROM
+  members JOIN ins
+    ON ins.member = members.name
 ;
 
-CREATE OR REPLACE FUNCTION shift(id INTEGER)
-RETURNS VOID AS
+--  update form shifters
+  -- shifted value from false to true
+
+-- attach trigger to update on members
+
+CREATE OR REPLACE FUNCTION shift()
+RETURNS TRIGGER AS
 $$
-DECLARE id INTEGER;
 BEGIN
-  -- whenever a Member's damaged state is set to true,  <--- comes later
-  -- select from shifters where their id is the same as member's id
+  -- whenever a Member's damaged state is set to true,
+  -- select from shifters
+  -- where their id is the same as member's id
   -- and set their shifted bool to true
   UPDATE shifters
   SET shifted = TRUE
-  WHERE shifters.member_id = $1;
+  WHERE NEW.damaged = TRUE;
+  RETURN NEW;
 END $$ LANGUAGE 'plpgsql';
 
-SELECT shift(1);
+CREATE TRIGGER cause_shift
+  AFTER UPDATE
+  ON members
+  FOR EACH ROW
+EXECUTE PROCEDURE shift();
 
+SELECT * FROM members;
 SELECT * FROM shifters;
+
+SELECT members.id, shifters.name, members.rank, members.damaged, shifters.shifted FROM shifters, members WHERE shifters.member_id = members.id;
+
+UPDATE members SET damaged = TRUE WHERE id = 1;
+
+SELECT members.id, shifters.name, members.rank, members.damaged, shifters.shifted FROM shifters, members WHERE shifters.member_id = members.id;
